@@ -12,17 +12,35 @@ base_dir <- getwd()
 output_dir <- file.path(base_dir, "outputs")
 dir.create(output_dir, showWarnings = FALSE)
 
+# Logs folder + log file for this run
+logs_dir <- file.path(base_dir, "logs")
+dir.create(logs_dir, showWarnings = FALSE)
+log_file <- file.path(logs_dir, sprintf("audio_analysis_%s.log", format(Sys.time(), "%Y%m%d_%H%M%S")))
+
+log_msg <- function(...) {
+  msg <- sprintf(...)
+  line <- sprintf("[%s] %s", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), msg)
+  message(line)
+  cat(line, file = log_file, sep = "\n", append = TRUE)
+}
+
+log_msg("Starting audio analysis run. Found %d folder(s) in '%s'.", length(folders), data_dir)
+
 for(folder in folders) {
   setwd(file.path(base_dir, data_dir, folder))
-  print(folder)
+  log_msg("Processing folder: %s", folder)
   # Collect .wav files
   file_list <- list.files(getwd(), pattern = "\\.wav$", full.names = TRUE)
-  if (length(file_list) == 0) stop("No .wav files found in the folder.")
-  
+  if (length(file_list) == 0) {
+    log_msg("No .wav files found in folder '%s'. Stopping.", folder)
+    stop("No .wav files found in the folder.")
+  }
+  log_msg("Found %d .wav file(s) in folder '%s'.", length(file_list), folder)
+
   # Choose cores (leave 1 free; never exceed number of files)
   n_cores <- max(1, min(detectCores() - 1L, length(file_list)))
-  message(sprintf("Using %d worker(s) out of %d logical cores.", n_cores, detectCores()))
-  
+  log_msg("Using %d worker(s) out of %d logical cores.", n_cores, detectCores())
+
   # Start cluster
   cl <- makeCluster(n_cores)
   
@@ -69,14 +87,26 @@ for(folder in folders) {
   })
   
   final_results <- do.call(rbind, results_list)
-  
+
+  # Log any per-file errors captured during analysis
+  if ("error" %in% names(final_results)) {
+    error_rows <- final_results[!is.na(final_results$error), ]
+    if (nrow(error_rows) > 0) {
+      for (i in seq_len(nrow(error_rows))) {
+        log_msg("ERROR processing file '%s': %s", error_rows$file[i], error_rows$error[i])
+      }
+    }
+  }
+
   # Modify filename for saving
   file_name <- paste0(folder, "_summary.csv")
-  
+
   # Save
   setwd(base_dir)
   out_path <- file.path(output_dir, file_name)
   write.csv(final_results, out_path, row.names = FALSE)
-  message(sprintf("Done. Wrote: %s", out_path))
-  
+  log_msg("Done with folder '%s'. Wrote: %s", folder, out_path)
+
 }
+
+log_msg("Audio analysis run complete. Log saved to: %s", log_file)
