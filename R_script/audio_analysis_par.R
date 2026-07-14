@@ -26,24 +26,27 @@ log_msg <- function(...) {
 
 # Function run by each worker to analyze a single file
 analyze_file <- function(fil) {
-  out <- try({
-    res <- soundgen::analyze(
-      fil,
-      samplingRate = 16000,
-      plot = FALSE
-    )
-    df <- as.data.frame(res$summary)
-    df$file <- basename(fil)
-    df$path <- fil
-    df$error <- NA_character_
-    df
-  }, silent = TRUE)
+  out <- try(
+    {
+      res <- soundgen::analyze(
+        fil,
+        samplingRate = 16000,
+        plot = FALSE
+      )
+      df <- as.data.frame(res$summary)
+      df$file <- basename(fil)
+      df$path <- fil
+      df$error <- NA_character_
+      df
+    },
+    silent = TRUE
+  )
 
   if (inherits(out, "try-error")) {
     # Return a minimal, consistent row on failure
     data.frame(
-      file  = basename(fil),
-      path  = fil,
+      file = basename(fil),
+      path = fil,
       error = as.character(attr(out, "condition")$message),
       stringsAsFactors = FALSE
     )
@@ -60,10 +63,12 @@ names(folder_file_lists) <- folders
 total_files <- sum(vapply(folder_file_lists, length, integer(1)))
 overall_processed <- 0
 
-log_msg("Starting audio analysis run. Found %d folder(s) and %d file(s) total in '%s'.",
-        length(folders), total_files, data_dir)
+log_msg(
+  "Starting audio analysis run. Found %d folder(s) and %d file(s) total in '%s'.",
+  length(folders), total_files, data_dir
+)
 
-for(folder in folders) {
+for (folder in folders) {
   setwd(file.path(base_dir, data_dir, folder))
   log_msg("Processing folder: %s", folder)
   # Collect .wav files
@@ -94,13 +99,15 @@ for(folder in folders) {
 
     folder_processed <- folder_processed + length(batch)
     overall_processed <- overall_processed + length(batch)
-    log_msg("Progress: %d/%d files in folder '%s' | %d/%d overall",
-            folder_processed, n_files, folder, overall_processed, total_files)
+    log_msg(
+      "Progress: %d/%d files in folder '%s' | %d/%d overall",
+      folder_processed, n_files, folder, overall_processed, total_files
+    )
   }
 
   # Stop cluster
   stopCluster(cl)
-  
+
   # Bind rows (works even if some rows are error-only)
   # Fill missing cols gracefully
   all_cols <- unique(unlist(lapply(results_list, names)))
@@ -109,7 +116,7 @@ for(folder in folders) {
     if (length(missing)) x[missing] <- NA
     x[all_cols]
   })
-  
+
   final_results <- do.call(rbind, results_list)
 
   # Log any per-file errors captured during analysis
@@ -130,7 +137,6 @@ for(folder in folders) {
   out_path <- file.path(output_dir, file_name)
   write.csv(final_results, out_path, row.names = FALSE)
   log_msg("Done with folder '%s'. Wrote: %s", folder, out_path)
-
 }
 
 log_msg("Audio analysis run complete. Log saved to: %s", log_file)

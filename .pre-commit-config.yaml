@@ -1,0 +1,53 @@
+exclude: '^renv/'
+
+repos:
+  # Generic hygiene checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+
+  # Guard against committing field-survey data (Confidential / Highly Confidential
+  # per IPA's data classification policy). .gitignore stops untracked files, but
+  # not a forced `git add`, so these hooks are a second line of defense.
+  - repo: local
+    hooks:
+      - id: no-audio-data
+        name: Block committing files under data/
+        language: fail
+        entry: >-
+          Files under data/ must not be committed. Field-survey audio and
+          derived data are IPA Confidential/Highly Confidential. Unstage the
+          file(s) and confirm .gitignore covers this path.
+        files: '^data/'
+        exclude: '(^|/)(\.gitkeep|README\.md)$'
+
+      - id: no-log-files
+        name: Block committing log files
+        language: fail
+        entry: >-
+          Log files must not be committed. They may contain file paths or
+          participant identifiers from field-survey processing runs.
+        files: '^logs/.*\.log$'
+        exclude: '(^|/)(\.gitkeep|README\.md)$'
+
+      - id: no-output-csv
+        name: Block committing output summary CSVs
+        language: fail
+        entry: >-
+          Output summary CSVs must not be committed. They contain
+          per-recording audio-quality results derived from field-survey data.
+        files: '^outputs/.*\.csv$'
+
+  # R styling and linting
+  - repo: https://github.com/lorenzwalthert/precommit
+    rev: v0.4.3.9029
+    hooks:
+      - id: style-files
+        args: [--style_pkg=styler, --style_fun=tidyverse_style]
+      - id: lintr

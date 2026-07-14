@@ -1,0 +1,9 @@
+linters: linters_with_defaults(
+    line_length_linter(120),
+    object_usage_linter = NULL # disabled: pre-commit's isolated R env doesn't
+                                # have this project's audio-analysis packages
+                                # installed, causing false positives
+  )
+exclusions: list(
+    "renv"
+  )
